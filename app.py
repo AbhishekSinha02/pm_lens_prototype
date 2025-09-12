@@ -6,6 +6,7 @@ from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
 from io import BytesIO
+from pptx.dml.color import RGBColor
 import math
 import json
 import re
@@ -20,6 +21,25 @@ client = OpenAI(api_key=api_key)
 # -----------------------------
 tasks_df = pd.read_csv("tasks.csv")
 team_df = pd.read_csv("team.csv")
+# Total project tasks
+total_tasks = len(tasks_df)
+
+# Completed tasks (past and current sprints)
+completed_tasks = len(tasks_df[tasks_df['status'].isin(['done','completed'])])
+
+# Current sprint number (assuming latest sprint is max sprint number)
+current_sprint = tasks_df['sprint'].max()
+
+# Tasks in current sprint
+current_sprint_tasks_df = tasks_df[tasks_df['sprint'] == current_sprint]
+sprint_tasks = len(current_sprint_tasks_df)
+sprint_completed = len(current_sprint_tasks_df[current_sprint_tasks_df['status'].isin(['done','completed'])])
+
+# Risk detection (example: if any task in current sprint has high priority and not completed)
+risk_present = len(current_sprint_tasks_df[
+    (current_sprint_tasks_df['priority'].str.lower() == 'high') & 
+    (~current_sprint_tasks_df['status'].isin(['done','completed']))
+]) > 0
 
 @st.cache_data
 def load_data():
@@ -36,7 +56,7 @@ st.title("📊 PM Project Lens - Risk Analysis & Mitigation Plan")
 
 prompt_input = st.text_area(
     "Enter your risk analysis prompt", 
-    "Identify tasks that are most likely to cause delays due to vague requirements or high priority."
+    "Create Sprint 5 WSR and Identify tasks that are most likely to cause delays due to vague requirements or high priority."
 )
 
 # 🔹 Slider to control number of records
@@ -70,6 +90,63 @@ def extract_sprint_number(prompt_text):
                 pass
     return None
 
+def calculate_project_overview(total_tasks, completed_tasks, sprint_tasks, sprint_completed, risk_present):
+    # Project scope delivered %
+    project_scope_delivered = (completed_tasks / total_tasks) * 100 if total_tasks else 0
+    
+    # Sprint % delivered
+    sprint_delivered = (sprint_completed / sprint_tasks) * 100 if sprint_tasks else 0
+    
+    # Determine Project Status
+    if completed_tasks == total_tasks and not risk_present:
+        project_status = ("Good", RGBColor(0, 176, 80))  # Green
+    elif completed_tasks == total_tasks and risk_present or completed_tasks != total_tasks and not risk_present:
+        project_status = ("Average", RGBColor(255, 192, 0))  # Amber
+    else:
+        project_status = ("Bad", RGBColor(255, 0, 0))  # Red
+    
+    return project_scope_delivered, sprint_delivered, project_status
+
+
+def add_project_overview_slide(prs, total_tasks, completed_tasks, sprint_tasks, sprint_completed, risk_present):
+    # Calculate values
+    project_scope, sprint_pct, status = calculate_project_overview(
+        total_tasks, completed_tasks, sprint_tasks, sprint_completed, risk_present
+    )
+    status_text, status_color = status
+
+    # Add slide
+    slide_layout = prs.slide_layouts[5]  # Blank layout
+    slide = prs.slides.add_slide(slide_layout)
+    # Remove all placeholder shapes (like "Click to add title")
+    for shape in slide.shapes:
+        if shape.is_placeholder:
+            sp = shape
+            slide.shapes._spTree.remove(sp._element)
+    # Title
+    title = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(1))
+    title_tf = title.text_frame
+    title_tf.text = "Project Overview"
+    title_tf.paragraphs[0].font.size = Pt(32)
+    title_tf.paragraphs[0].font.bold = True
+
+    # Project Scope Delivered
+    scope_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(1))
+    scope_tf = scope_box.text_frame
+    scope_tf.text = f"PROJECT SCOPE DELIVERED: {project_scope:.2f}%"
+
+    # Sprint % Delivered
+    sprint_box = slide.shapes.add_textbox(Inches(0.5), Inches(2.3), Inches(9), Inches(1))
+    sprint_tf = sprint_box.text_frame
+    sprint_tf.text = f"SPRINT % DELIVERED: {sprint_pct:.2f}%"
+
+    # Project Status
+    status_box = slide.shapes.add_textbox(Inches(0.5), Inches(3.1), Inches(9), Inches(1))
+    status_tf = status_box.text_frame
+    p = status_tf.paragraphs[0]
+    p.text = f"PROJECT STATUS: {status_text}"
+    p.font.color.rgb = status_color
+    p.font.bold = True
 
 def create_wsr_pptx_from_df(results_df,
                             sprint_df=None,
@@ -218,6 +295,22 @@ def create_wsr_pptx_from_df(results_df,
             headers=["Task", "Owner", "Risk Score", "Mitigation Plan"],
             col_width_ratios=[0.25, 0.15, 0.12, 0.48]
         )
+    
+    # Completed tasks (status == Closed)
+    completed_tasks = len(tasks_df[tasks_df['status'] == 'Closed'])
+
+    # Current sprint tasks
+    current_sprint_tasks_df = tasks_df[tasks_df['sprint'] == sprint_number]
+    sprint_tasks = len(current_sprint_tasks_df)
+    sprint_completed = len(current_sprint_tasks_df[current_sprint_tasks_df['status'] == 'Closed'])
+
+    # Risk present
+    risk_present = len(current_sprint_tasks_df[
+        (current_sprint_tasks_df['priority'].str.lower() == 'high') & 
+        (current_sprint_tasks_df['status'].isin(['Open','InProgress']))
+    ]) > 0
+
+    add_project_overview_slide(prs, total_tasks, completed_tasks, sprint_tasks, sprint_completed, risk_present)
 
     # Save to bytes
     bio = BytesIO()
@@ -316,6 +409,7 @@ if st.button("Analyze Risks"):
                         sprint_number=sprint_num,
                         template_path="WSR_Framework.pptx"
                     )
+                    
                     # 4) download button
                     st.download_button(
                         f"⬇ Download WSR for Sprint {sprint_num}",
