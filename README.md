@@ -23,3 +23,13 @@ Notes:
  - The app expects that Azure/OpenAI will return a JSON-parsable output if used; otherwise it will fallback to local parsing and scoring.
  - Feel free to edit app.py to change heuristics, add more fields, or integrate other LLM providers.
 
+
+Example Prompts:
+
+Create WSR for Sprint 4 and Identify all tasks where the owner is handling more than 3 high-priority items and explain the increased risk
+
+Create WSR for Sprint 5 and Identify all tasks where the owner is handling more than 3 high-priority items and explain the increased risk
+
+Create WSR for Sprint 3 and Show tasks most at risk of scope creep if customers request additional requirements mid-project
+
+Create WSR for Sprint 2 and Detect tasks where unclear specifications or prototypes could cause quality or timeline issues.

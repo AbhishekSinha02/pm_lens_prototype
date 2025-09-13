@@ -52,7 +52,13 @@ def load_data():
 # Streamlit UI
 # -----------------------------
 st.set_page_config(page_title="📊PM Project Lens", layout="wide")
-st.title("📊 PM Project Lens - Risk Analysis & Mitigation Plan")
+col1, col2 = st.columns([1, 6])  # adjust width ratio
+with col1:
+    st.image("pmprojectlens.png", width=160)  # your logo
+with col2:
+    st.title("PM Project Lens - AI Powered Project Manager Assistant")
+    st.subheader("Weekly Status Report (WSR), Risk Analysis & Mitigation Plan")  # Additional text
+
 
 prompt_input = st.text_area(
     "Enter your risk analysis prompt", 
@@ -67,7 +73,15 @@ max_records = st.slider(
     value=min(5, len(tasks_df)),  # default 5 or less if fewer tasks
     step=1
 )
-
+def remove_slide(prs, slide):
+    """Remove a slide from a presentation"""
+    xml_slides = prs.slides._sldIdLst  # internal slide list
+    slides = list(xml_slides)
+    for i, s in enumerate(slides):
+        if prs.slides[i] == slide:
+            xml_slides.remove(s)
+            break
+            
 def extract_sprint_number(prompt_text):
     """
     Try to extract sprint number from the user prompt.
@@ -311,7 +325,7 @@ def create_wsr_pptx_from_df(results_df,
     ]) > 0
 
     add_project_overview_slide(prs, total_tasks, completed_tasks, sprint_tasks, sprint_completed, risk_present)
-
+    remove_slide(prs, prs.slides[1])
     # Save to bytes
     bio = BytesIO()
     prs.save(bio)
