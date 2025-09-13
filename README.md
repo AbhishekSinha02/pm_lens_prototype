@@ -16,7 +16,7 @@ How to run:a
 3. To enable Azure OpenAI or OpenAI modes, set environment variables or enter keys in the sidebar:
    - Azure: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY, AZURE_OPENAI_DEPLOYMENT
    - OpenAI: OPENAI_API_KEY
-4. If no keys are provided the app will use a small local fallback parser that extracts priorities, skills, and deadline numbers from your prompt.
+   - (setx OPENAI_API_KEY "OPENAI_API_KEY")
 
 Notes:
  - The sample data is synthetic for demonstration and hackathon use.
